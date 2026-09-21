@@ -1,0 +1,34 @@
+condition,film,lang,rougeL_f1
+CMB-AD (Ours),8_Tage_im_August,de,0.0793
+CMB-AD (Ours),Moskau_einfach,de,0.111
+CMB-AD (Ours),Baghdad_in_my_Shadow,de,0.0969
+CMB-AD (Ours),Trommelwirbel,de,0.1047
+CMB-AD (Ours),La_Tentazione_Di_Esistere,it,0.1151
+CMB-AD (Ours),Quanto_basta,it,0.127
+CMB-AD (Ours),Riders_of_justice,it,0.1129
+CMB-AD (Ours),Stuerm,it,0.1106
+Baseline 1 (No-CMB),8_Tage_im_August,de,0.0735
+Baseline 1 (No-CMB),Moskau_einfach,de,0.0948
+Baseline 1 (No-CMB),Baghdad_in_my_Shadow,de,0.083
+Baseline 1 (No-CMB),Trommelwirbel,de,0.0866
+Baseline 1 (No-CMB),La_Tentazione_Di_Esistere,it,0.1027
+Baseline 1 (No-CMB),Quanto_basta,it,0.1138
+Baseline 1 (No-CMB),Riders_of_justice,it,0.0953
+Baseline 1 (No-CMB),Stuerm,it,0.0979
+Baseline 2 (Always-ID),8_Tage_im_August,de,0.0758
+Baseline 2 (Always-ID),Moskau_einfach,de,0.095
+Baseline 2 (Always-ID),Baghdad_in_my_Shadow,de,0.0876
+Baseline 2 (Always-ID),Trommelwirbel,de,0.0913
+Baseline 2 (Always-ID),La_Tentazione_Di_Esistere,it,0.1016
+Baseline 2 (Always-ID),Quanto_basta,it,0.1176
+Baseline 2 (Always-ID),Riders_of_justice,it,0.0968
+Baseline 2 (Always-ID),Stuerm,it,0.1007
+CMB-AD (Ours),MACRO_MEAN,all,0.1072
+CMB-AD (Ours),MACRO_MEAN_DE,de,0.098
+CMB-AD (Ours),MACRO_MEAN_IT,it,0.1164
+Baseline 1 (No-CMB),MACRO_MEAN,all,0.0935
+Baseline 1 (No-CMB),MACRO_MEAN_DE,de,0.0845
+Baseline 1 (No-CMB),MACRO_MEAN_IT,it,0.1024
+Baseline 2 (Always-ID),MACRO_MEAN,all,0.0958
+Baseline 2 (Always-ID),MACRO_MEAN_DE,de,0.0874
+Baseline 2 (Always-ID),MACRO_MEAN_IT,it,0.1042

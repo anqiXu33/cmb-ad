@@ -1,0 +1,93 @@
+# Reproducibility metadata
+# UTC:  20260530T221729Z
+# Job:  3608281
+# Node: u24-chaihm0-634
+
+## Python
+Python 3.12.10
+pip 25.0.1 from /home/anxu/data/condas/envs/AD-generation/lib/python3.12/site-packages/pip (python 3.12)
+
+## Key package versions (queried at import time)
+torch                    2.6.0+cu126
+transformers             5.3.0
+tokenizers               0.22.1
+accelerate               1.6.0
+flash_attn               <import failed: ImportError>
+bitsandbytes             0.46.0
+sentence_transformers    <import failed: ModuleNotFoundError>
+spacy                    3.8.5
+sacrebleu                2.6.0
+bert_score               0.3.12
+evaluate                 0.4.6
+nltk                     3.9.4
+insightface              0.7.3
+decord                   0.6.0
+scenedetect              0.6.6
+PIL                      12.0.0
+openpyxl                 <import failed: ModuleNotFoundError>
+num2words                <no __version__>
+pandas                   2.2.3
+numpy                    2.3.5
+
+torch.version.cuda          12.6
+torch.cuda.is_available()   True
+torch.cuda.device_count()   1
+torch.cuda.get_device_name  NVIDIA H100 NVL
+spacy[de_core_news_sm   ] 3.8.0
+spacy[it_core_news_sm   ] 3.8.0
+spacy[de_core_news_lg   ] <not installed>
+spacy[en_core_web_lg    ] <not installed>
+
+## CUDA / driver
+nvcc: NVIDIA (R) Cuda compiler driver
+Copyright (c) 2005-2025 NVIDIA Corporation
+Built on Tue_May_27_02:21:03_PDT_2025
+Cuda compilation tools, release 12.9, V12.9.86
+Build cuda_12.9.r12.9/compiler.36037853_0
+
+Sun May 31 00:23:07 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.95.05              Driver Version: 580.95.05      CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA H100 NVL                Off |   00000000:F2:00.0 Off |                    0 |
+| N/A   34C    P0             59W /  400W |       4MiB /  95830MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+
+## Loaded modules
+
+Currently Loaded Modules:
+  1) miniforge3/25.3.0-3          4) libiconv/1.18-vemdwm4   7) libxml2/2.13.5-blhpq6x
+  2) glibc/2.39-4bfivdk           5) xz/5.6.3-qncvhgr        8) cuda/12.6.3
+  3) gcc-runtime/13.3.0-mqqgazx   6) zlib-ng/2.2.4-wpw37xz
+
+ 
+
+
+## OS
+Linux u24-chaihm0-634 6.8.0-106-generic #106-Ubuntu SMP PREEMPT_DYNAMIC Fri Mar  6 07:58:08 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+PRETTY_NAME="Ubuntu 24.04.4 LTS"
+NAME="Ubuntu"
+VERSION_ID="24.04"
+VERSION="24.04.4 LTS (Noble Numbat)"
+VERSION_CODENAME=noble
+ID=ubuntu
+ID_LIKE=debian
+HOME_URL="https://www.ubuntu.com/"
+SUPPORT_URL="https://help.ubuntu.com/"
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+UBUNTU_CODENAME=noble
+LOGO=ubuntu-logo

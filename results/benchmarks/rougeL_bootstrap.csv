@@ -1,0 +1,3 @@
+contrast,scope,n_films,mean_delta,ci_lo,ci_hi,direction_consistency
+CMB-AD vs Baseline 1,all,8,0.0137,0.011,0.0161,1.0
+CMB-AD vs Baseline 2,all,8,0.0114,0.0085,0.014,1.0

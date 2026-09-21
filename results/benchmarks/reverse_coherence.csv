@@ -1,0 +1,17 @@
+Movie,Model,Pronoun_Rate_Continuing
+8_Tage_im_August,Human (Ground Truth),35.7
+8_Tage_im_August,Baseline 1 (Single-shot),10.5
+8_Tage_im_August,Baseline 2 (Always-ID),0.4
+8_Tage_im_August,CMB-AD (Ours),36.4
+Moskau_einfach,Human (Ground Truth),31.8
+Moskau_einfach,Baseline 1 (Single-shot),8.8
+Moskau_einfach,Baseline 2 (Always-ID),0.0
+Moskau_einfach,CMB-AD (Ours),39.6
+Baghdad_in_my_Shadow,Human (Ground Truth),23.4
+Baghdad_in_my_Shadow,Baseline 1 (Single-shot),8.2
+Baghdad_in_my_Shadow,Baseline 2 (Always-ID),3.0
+Baghdad_in_my_Shadow,CMB-AD (Ours),38.2
+Trommelwirbel,Human (Ground Truth),26.3
+Trommelwirbel,Baseline 1 (Single-shot),4.4
+Trommelwirbel,Baseline 2 (Always-ID),0.0
+Trommelwirbel,CMB-AD (Ours),28.3

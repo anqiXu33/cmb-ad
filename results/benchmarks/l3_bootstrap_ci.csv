@@ -1,0 +1,11 @@
+metric,metric_label,baseline,n_films,mean_delta,ci95_low,ci95_high,sign_consistent,per_film_deltas,orientation
+RDA,RDA,Baseline 1 (No-CMB),8,0.17709,0.13391,0.22562,True,"[0.13182, 0.12788, 0.11389, 0.10729, 0.19492, 0.2865, 0.28094, 0.1735]",higher
+RDA,RDA,Baseline 2 (Always-ID),8,0.15438,0.12115,0.19036,True,"[0.17187, 0.11993, 0.08759, 0.19216, 0.10065, 0.16335, 0.25102, 0.14844]",higher
+form_dist_L1,Form distribution L1,Baseline 1 (No-CMB),8,0.18672,0.14257,0.22504,True,"[0.13662, 0.23258, 0.18033, 0.23927, 0.06301, 0.26132, 0.19918, 0.18146]",lower
+form_dist_L1,Form distribution L1,Baseline 2 (Always-ID),8,0.17151,0.12273,0.20937,True,"[0.15404, 0.20255, 0.15102, 0.23101, 0.03048, 0.2245, 0.22676, 0.15174]",lower
+Reintro_Prec_M_sys,Mention-level Re-intro Prec,Baseline 1 (No-CMB),8,0.03173,0.00839,0.05448,True,"[0.07881, 0.05889, 0.02592, 0.02304, 0.05812, 0.04366, -0.01948, -0.0151]",higher
+Reintro_Prec_M_sys,Mention-level Re-intro Prec,Baseline 2 (Always-ID),8,-0.05074,-0.07614,-0.03212,False,"[-0.04998, -0.04226, -0.05882, -0.12851, -0.01355, -0.03263, -0.02841, -0.0518]",higher
+Continuing_PRN_rate_M_sys,Continuing PRN Rate (target = GT),Baseline 1 (No-CMB),8,0.07483,0.0094,0.13823,True,"[0.14074, 0.1655, -0.03158, 0.20492, -0.03, -0.02529, 0.02517, 0.14919]",matches_human
+Continuing_PRN_rate_M_sys,Continuing PRN Rate (target = GT),Baseline 2 (Always-ID),8,0.14823,0.06373,0.23094,True,"[0.26915, 0.26092, 0.01532, 0.29142, 0.02764, 0.02833, 0.05894, 0.23414]",matches_human
+PRD_H_M,PRD-H,Baseline 1 (No-CMB),8,0.07483,0.0094,0.13823,True,"[0.14074, 0.1655, -0.03158, 0.20492, -0.03, -0.02529, 0.02517, 0.14919]",lower
+PRD_H_M,PRD-H,Baseline 2 (Always-ID),8,0.14823,0.06373,0.23094,True,"[0.26915, 0.26092, 0.01532, 0.29142, 0.02764, 0.02833, 0.05894, 0.23414]",lower

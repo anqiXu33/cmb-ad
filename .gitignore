@@ -1,0 +1,32 @@
+# Python bytecode cache — never commit these
+__pycache__/
+*.pyc
+*.pyo
+
+# macOS metadata
+.DS_Store
+._*
+**/._.DS_Store
+logs/
+*.partial
+
+# Claude Code project instructions + per-project session state
+CLAUDE.md
+.claude/
+
+# Local thesis-writing notes (drafts / talking points, not source code)
+THESIS_NOTES.md
+docs/thesis/
+
+# Audit-pipeline intermediate (scripts/tools/audit_descriptions.py output;
+# final state lives in data/manual_curation/manual_descriptions_consolidated.xlsx)
+manual_descriptions_todo.csv
+
+# SWISS TXT data and outputs (not public)
+data/
+results/stage2/
+results/preprocess/
+results/human_eval/
+results/eval_reports/
+results/test/
+.env

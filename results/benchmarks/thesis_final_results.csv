@@ -1,0 +1,33 @@
+Movie,Language,Model,BLEU,CHRF,BERTScore_F1,Coherence_Score
+La_Tentazione_Di_Esistere,Italian,Baseline 1 (No-CMB),0.87,18.56,0.7064,96.0
+La_Tentazione_Di_Esistere,Italian,Baseline 2 (Always-ID),0.71,18.3,0.7076,98.0
+La_Tentazione_Di_Esistere,Italian,CMB-AD (Ours),1.7,20.04,0.7164,97.3
+La_Tentazione_Di_Esistere,Italian,Human (Ground Truth),,,,84.5
+Quanto_basta,Italian,Baseline 1 (No-CMB),0.98,21.45,0.7104,90.1
+Quanto_basta,Italian,Baseline 2 (Always-ID),0.96,19.23,0.7154,96.4
+Quanto_basta,Italian,CMB-AD (Ours),1.45,20.94,0.7185,94.6
+Quanto_basta,Italian,Human (Ground Truth),,,,87.2
+Stuerm,Italian,Baseline 1 (No-CMB),1.07,19.5,0.7124,96.2
+Stuerm,Italian,Baseline 2 (Always-ID),0.79,17.72,0.7149,99.0
+Stuerm,Italian,CMB-AD (Ours),1.68,20.31,0.7211,95.9
+Stuerm,Italian,Human (Ground Truth),,,,86.6
+Riders_of_justice,Italian,Baseline 1 (No-CMB),0.54,20.59,0.7094,94.3
+Riders_of_justice,Italian,Baseline 2 (Always-ID),0.46,19.02,0.7134,96.6
+Riders_of_justice,Italian,CMB-AD (Ours),0.42,19.58,0.717,93.6
+Riders_of_justice,Italian,Human (Ground Truth),,,,90.9
+8_Tage_im_August,German,Baseline 1 (No-CMB),0.68,17.65,0.6957,100.0
+8_Tage_im_August,German,Baseline 2 (Always-ID),0.35,14.3,0.7016,100.0
+8_Tage_im_August,German,CMB-AD (Ours),0.83,17.67,0.7019,100.0
+8_Tage_im_August,German,Human (Ground Truth),,,,80.5
+Moskau_einfach,German,Baseline 1 (No-CMB),1.2,19.07,0.7085,96.2
+Moskau_einfach,German,Baseline 2 (Always-ID),0.63,15.51,0.7148,98.1
+Moskau_einfach,German,CMB-AD (Ours),1.19,18.87,0.7189,98.1
+Moskau_einfach,German,Human (Ground Truth),,,,92.5
+Baghdad_in_my_Shadow,German,Baseline 1 (No-CMB),0.76,18.53,0.7064,91.1
+Baghdad_in_my_Shadow,German,Baseline 2 (Always-ID),0.21,13.08,0.7138,96.4
+Baghdad_in_my_Shadow,German,CMB-AD (Ours),0.69,17.84,0.7173,98.2
+Baghdad_in_my_Shadow,German,Human (Ground Truth),,,,82.1
+Trommelwirbel,German,Baseline 1 (No-CMB),0.73,19.76,0.703,100.0
+Trommelwirbel,German,Baseline 2 (Always-ID),0.64,18.33,0.7085,100.0
+Trommelwirbel,German,CMB-AD (Ours),0.6,18.34,0.7129,100.0
+Trommelwirbel,German,Human (Ground Truth),,,,88.9

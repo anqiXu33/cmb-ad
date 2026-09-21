@@ -1,0 +1,37 @@
+{
+  "votes_file": "results/human_eval/paired_blind_Quanto_basta_Annette.csv",
+  "n_total_rows": 421,
+  "counts": {
+    "A_raw": 54,
+    "B_raw": 141,
+    "Tie_E": 219,
+    "Tie_explicit": 0,
+    "excluded_credits": 0,
+    "unvoted": 7,
+    "Tie": 219,
+    "CMB_wins": 141,
+    "Baseline_wins": 54
+  },
+  "decisive": {
+    "n": 195,
+    "cmb_wins": 141,
+    "baseline_wins": 54,
+    "cmb_win_rate": 0.7231,
+    "ci95_low": 0.6546,
+    "ci95_high": 0.7846,
+    "p_one_sided": 1.8837084647037228e-10,
+    "p_two_sided": 3.7674169294074455e-10
+  },
+  "all_judged": {
+    "n": 414,
+    "cmb_wins": 141,
+    "baseline_wins": 54,
+    "ties": 219,
+    "score_with_ties_as_half": 0.6051,
+    "cmb_strict_preference": 0.3406,
+    "baseline_strict_preference": 0.1304,
+    "tie_rate": 0.529
+  },
+  "cmb_label": "CMB-AD",
+  "baseline_label": "B1 (No-CMB)"
+}
