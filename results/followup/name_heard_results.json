@@ -1,0 +1,60 @@
+{
+  "ad_column": "audio_description_us",
+  "n_movies": 196,
+  "n_ad_lines": 50200,
+  "n_subtitle_lines": 53598,
+  "label_counts": {
+    "NAME": 18353,
+    "PRN": 12801,
+    "DESC": 99
+  },
+  "A_first_naming_vs_dialogue": {
+    "n_characters_named_in_AD": 1458,
+    "shares": {
+      "spoken before first AD naming": 0.353,
+      "AD names before it is spoken": 0.358,
+      "never spoken in subtitles": 0.289
+    },
+    "counts": {
+      "spoken before first AD naming": 515,
+      "AD names before it is spoken": 522,
+      "never spoken in subtitles": 421
+    },
+    "delay_sec_spoken_to_AD_name": {
+      "median": 65.47000000000025,
+      "p25": 17.17999999999995,
+      "p75": 1345.895
+    }
+  },
+  "B_predictive_prn_vs_explicit": {
+    "n": 31253,
+    "n_movies": 196,
+    "discourse": {
+      "acc_bin": 0.7909320705212299,
+      "f1_prn": 0.7560848140958638,
+      "pred_prn_rate": 0.4475410360605382,
+      "gold_prn_rate": 0.4095926791028061
+    },
+    "discourse+heard": {
+      "acc_bin": 0.7913800275173584,
+      "f1_prn": 0.7560062869545693,
+      "pred_prn_rate": 0.4454292387930759,
+      "gold_prn_rate": 0.4095926791028061
+    },
+    "subset_heard": {
+      "discourse": {
+        "acc_bin": 0.7811436827142657,
+        "f1_prn": 0.7406957482054114,
+        "pred_prn_rate": 0.43789905392179707,
+        "gold_prn_rate": 0.4061145546907769
+      },
+      "discourse+heard": {
+        "acc_bin": 0.7823554084914014,
+        "f1_prn": 0.7415033765083583,
+        "pred_prn_rate": 0.4358484410681829,
+        "gold_prn_rate": 0.4061145546907769
+      },
+      "n": 21457
+    }
+  }
+}
