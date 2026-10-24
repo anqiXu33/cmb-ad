@@ -74,6 +74,7 @@ def text_gender(charbank: list[dict], ad_mentions: list[list[Mention]]) -> dict[
 # ----------------------------------------------------------------------------
 def resolve_sequence(seq: pd.DataFrame, charbank: list[dict]):
     ext = EnglishMentionExtractor(charbank)
+    role_of = {str(c["id"]): c.get("role") or "" for c in charbank}
     ad_mentions = [ext.extract(t) for t in seq["text"]]
     gender = text_gender(charbank, ad_mentions)
 
@@ -87,6 +88,7 @@ def resolve_sequence(seq: pd.DataFrame, charbank: list[dict]):
         tswitch = _thread_switch(prev_thread, cur_thread)
         prev_thread = cur_thread
         bound: dict[str, str] = {}           # char -> first form in this AD
+        span: dict[str, tuple[int, str]] = {} # char -> (start, text) of that mention
         resolved_in_ad: list[str] = []
 
         for m in ms:
@@ -118,12 +120,15 @@ def resolve_sequence(seq: pd.DataFrame, charbank: list[dict]):
                 continue
             if cid not in bound:
                 bound[cid] = m.label
+                span[cid] = (m.start, m.text)
             resolved_in_ad.append(cid)
 
         for cid, form in bound.items():
             rows.append({"dataset": ad.dataset, "seq_id": ad.seq_id, "anno_idx": int(ad.anno_idx),
                          "start": float(ad.start), "end": float(ad.end), "text": ad.text,
                          "char_id": cid, "char_gender": gender.get(cid) or "", "label": form,
+                         "m_start": span[cid][0], "m_text": span[cid][1],
+                         "char_role": role_of.get(cid, ""),
                          "n_mentioned_cur": len(bound), "thread_switch": tswitch,
                          "shot_scale": getattr(ad, "shot_scale", None)})
         for cid in bound:
@@ -259,6 +264,7 @@ def main(datasets=("madeval", "tvad", "cmdad")):
     df, R = build_features(rows, ads)
     OUT.mkdir(parents=True, exist_ok=True)
     df.to_csv(OUT / "text_features.csv", index=False)
+    ads.to_csv(OUT / "text_ads.csv", index=False)
     R.to_csv(OUT / "text_rule_preds.csv", index=False)
     print("resolution:", dict(stats))
     print(df.groupby(["dataset", "label"]).size().unstack(fill_value=0).to_string())
