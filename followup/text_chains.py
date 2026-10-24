@@ -46,7 +46,7 @@ from followup.silver_labels import LOADERS, _thread_switch
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "results" / "followup"
 
-MAX_LOOKBACK = 4      # ADs a pronoun may reach back
+MAX_LOOKBACK = 2      # ADs a pronoun may reach back (human check: precision falls from 76% at 1 AD to 47% at 2 and 25% beyond)
 DESC_LOOKBACK = 2     # ADs a description may reach back
 INDEF_BLOCK = 3       # "a man" ... "the man" within this many ADs = the new person
 
@@ -94,21 +94,69 @@ ANCHOR_INTERVAL = 4
 def text_gender(charbank: list[dict], ad_mentions: list[list[Mention]]) -> dict[str, str | None]:
     prior = {str(c["id"]): guess_gender_from_role(c.get("role", "")) for c in charbank}
     votes: dict[str, Counter] = {}
-    for ms in ad_mentions:
+    for k, ms in enumerate(ad_mentions):
         names = [m for m in ms if m.label == "NAME" and len(m.char_ids) == 1]
-        if len(names) != 1:
+        if len({m.char_ids[0] for m in names}) != 1:
             continue
         cid = names[0].char_ids[0]
+        # pronouns after the only named character in the same AD
         for m in ms:
             if m.label == "PRN" and m.start > names[0].start:
                 g = mention_gender(m)
                 if g:
                     votes.setdefault(cid, Counter())[g] += 1
+        # a sentence-initial pronoun in the NEXT AD when that AD names nobody
+        if k + 1 < len(ad_mentions):
+            nxt = ad_mentions[k + 1]
+            if nxt and nxt[0].label == "PRN" and nxt[0].start == 0 and not any(m.label == "NAME" for m in nxt):
+                g = mention_gender(nxt[0])
+                if g:
+                    votes.setdefault(cid, Counter())[g] += 1
     out = dict(prior)
     for cid, v in votes.items():
         tot = sum(v.values())
-        if tot >= 3 and max(v.values()) / tot >= 0.8:
+        if tot >= 2 and max(v.values()) / tot >= 0.75:
             out[cid] = v.most_common(1)[0][0]
+    return out
+
+
+_NER = None
+
+
+def _ner_nlp():
+    global _NER
+    if _NER is None:
+        import spacy
+        _NER = spacy.load("en_core_web_sm", disable=["lemmatizer"])
+    return _NER
+
+
+def unknown_people(texts: list[str], lex: dict) -> list[list[tuple[int, int, str]]]:
+    """Per AD: person names spaCy finds that are NOT in the cast lexicon
+    (start, end, name). They are competitors for pronouns: "Scott opens his
+    jacket" must not hand "his" to a cast member."""
+    out = []
+    for doc in _ner_nlp().pipe(texts, batch_size=512):
+        found = []
+        for e in doc.ents:
+            if e.label_ != "PERSON":
+                continue
+            toks = [t.text.lower().rstrip("'’s") for t in e if t.text[:1].isupper()]
+            if toks and any(t in lex for t in toks):
+                continue
+            found.append((e.start_char, e.end_char, e.text))
+        # NER misses many sentence-initial names ("Viktor clicks his heels").
+        # A capitalised proper noun acting as subject or possessor is a person
+        # in AD often enough to count as a competitor.
+        taken = [(a, b) for a, b, _ in found]
+        for t in doc:
+            if t.pos_ != "PROPN" or not t.text[:1].isupper() or t.dep_ not in ("nsubj", "nsubjpass", "poss"):
+                continue
+            key = t.text.lower().rstrip("'’s")
+            if key in lex or any(a <= t.idx < b for a, b in taken):
+                continue
+            found.append((t.idx, t.idx + len(t.text), t.text))
+        out.append(found)
     return out
 
 
@@ -126,8 +174,23 @@ def resolve_sequence(seq: pd.DataFrame, charbank: list[dict]):
     last_mention_ad: dict[str, int] = {}     # char -> AD index of last mention
     rows, stats = [], Counter()
     prev_thread = None
-    history: list[tuple[int, str]] = []       # (ad_index, char) mention events in order
+    # every person mention, cast or not: (ad_index, start, key, gender);
+    # key = cast id, or "x:..." for someone outside the cast list
+    history: list[tuple[int, int, str, str | None]] = []
+    history_names: list[tuple[int, str]] = []  # (ad_index, char) cast mentions, for NAME tie-breaks
+    history_by_ad: dict[int, list] = {}
     indef_heads: list[tuple[int, str]] = []   # (ad_index, head noun) of "a X" introductions
+    others = unknown_people([str(t) for t in seq["text"]], ext.lex)
+
+    def compatible_entities(entries, g, excluded):
+        seen, out = set(), []
+        for (_, _, key, kg) in entries:
+            if key in excluded or key in seen:
+                continue
+            if _compatible(g, kg):
+                seen.add(key)
+                out.append(key)
+        return out
 
     for i, (ad, ms) in enumerate(zip(seq.itertuples(index=False), ad_mentions)):
         cur_thread = getattr(ad, "thread", None)
@@ -136,8 +199,15 @@ def resolve_sequence(seq: pd.DataFrame, charbank: list[dict]):
         bound: dict[str, str] = {}           # char -> first form in this AD
         span: dict[str, tuple[int, str]] = {} # char -> (start, text) of that mention
         resolved_in_ad: list[str] = []
+        ad_entities: list[tuple[int, int, str, str | None]] = []   # mentions so far in this AD
 
-        for m in ms:
+        name_spans = [(m.start, m.start + len(m.text)) for m in ms if m.label == "NAME"]
+        for (a, b, name) in others[i]:
+            if not any(a < nb and na < b for na, nb in name_spans):
+                ad_entities.append((i, a, "x:name:" + name.lower(), guess_gender_from_role(name)))
+        named_later = {(m.start, c) for m in ms if m.label == "NAME" for c in m.char_ids}
+
+        for m in sorted(ms, key=lambda x: x.start):
             cid = None
             if m.label == "NAME":
                 cands = m.char_ids
@@ -151,41 +221,55 @@ def resolve_sequence(seq: pd.DataFrame, charbank: list[dict]):
                 toks = _desc_tokens(m)
                 if toks and toks[0] in _INDEF:
                     indef_heads.append((i, m.head_lemma or toks[-1]))
-                if reason:
-                    stats[f"DESC_filtered_{reason}"] += 1
+                if not reason:
+                    # Recency does NOT work for descriptions: describers use "the
+                    # driver" precisely for someone other than the protagonist just
+                    # mentioned. Bind only when the description's content words
+                    # occur in exactly one cast member's role string ("the witch"
+                    # -> "Horned Witch", "the staff sergeant" -> "SSgt. ... ").
+                    content = {t for t in toks if t not in _DESC_STOP}
+                    hits = [c for c, rt in role_toks.items()
+                            if content and (content & rt) and c not in resolved_in_ad]
+                    if len(hits) == 1:
+                        cid = hits[0]
+                stats["DESC_resolved" if cid else (f"DESC_filtered_{reason}" if reason else "DESC_unresolved")] += 1
+                if cid is None:
+                    # an unbound description is still a person the listener now has in mind
+                    ad_entities.append((i, m.start, f"x:desc:{i}:{m.start}", mention_gender(m)))
                     continue
-                # Recency does NOT work for descriptions: describers use "the
-                # driver" precisely for someone other than the protagonist just
-                # mentioned. Bind only when the description's content words
-                # occur in exactly one cast member's role string ("the witch"
-                # -> "Horned Witch", "the staff sergeant" -> "SSgt. ... ").
-                content = {t for t in toks if t not in _DESC_STOP}
-                hits = [c for c, rt in role_toks.items()
-                        if content and (content & rt) and c not in resolved_in_ad]
-                if len(hits) == 1:
-                    cid = hits[0]
-                stats["DESC_resolved" if cid else "DESC_unresolved"] += 1
             else:
                 g = mention_gender(m)
-                # 1) a compatible character already resolved earlier in this AD
-                same_ad = [c for c in resolved_in_ad if _compatible(g, gender.get(c))]
-                if same_ad:
-                    cid = same_ad[0]
-                else:
-                    # 2) most recent compatible character in the last MAX_LOOKBACK ADs
-                    for j, c in reversed(history):
-                        if i - j > MAX_LOOKBACK:
+                # cast members named LATER in this AD cannot be the antecedent
+                # ("He points to Joey and Kate": He is not Joey)
+                excluded = {c for (st, c) in named_later if st > m.start}
+                # 1) most recent compatible person earlier in this AD
+                before = sorted([e for e in ad_entities if e[1] < m.start], key=lambda e: -e[1])
+                cands = compatible_entities(before, g, excluded)       # recency order
+                key = cands[0] if cands else None
+                reason = None
+                if key is None:
+                    # 2) previous ADs: the most recent AD holding a compatible person;
+                    #    two different compatible people there = ambiguous
+                    for j in range(i - 1, max(-1, i - 1 - MAX_LOOKBACK), -1):
+                        entries = history_by_ad.get(j, [])
+                        c2 = compatible_entities(entries, g, excluded)
+                        if c2:
+                            if len(c2) == 1:
+                                key = c2[0]
+                            else:
+                                reason = "ambiguous"
                             break
-                        if _compatible(g, gender.get(c)):
-                            cid = c
-                            break
-                stats[f"{m.label}_resolved" if cid else f"{m.label}_unresolved"] += 1
-            if cid is None:
-                continue
+                if key is not None and key.startswith("x:"):
+                    reason, key = "non_cast", None
+                cid = key
+                stats[f"{m.label}_resolved" if cid else f"{m.label}_unresolved_{reason or 'none'}"] += 1
+                if cid is None:
+                    continue
             if cid not in bound:
                 bound[cid] = m.label
                 span[cid] = (m.start, m.text)
             resolved_in_ad.append(cid)
+            ad_entities.append((i, m.start, cid, gender.get(cid)))
 
         for cid, form in bound.items():
             rows.append({"dataset": ad.dataset, "seq_id": ad.seq_id, "anno_idx": int(ad.anno_idx),
@@ -196,8 +280,10 @@ def resolve_sequence(seq: pd.DataFrame, charbank: list[dict]):
                          "n_mentioned_cur": len(bound), "thread_switch": tswitch,
                          "shot_scale": getattr(ad, "shot_scale", None)})
         for cid in bound:
-            history.append((i, cid))
+            history_names.append((i, cid))
             last_mention_ad[cid] = i
+        history.extend(ad_entities)
+        history_by_ad[i] = ad_entities
     return rows, stats
 
 
