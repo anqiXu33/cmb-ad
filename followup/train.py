@@ -27,16 +27,21 @@ from sklearn.model_selection import GroupKFold
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
-from followup.features import FEATURE_COLS
+import argparse
+
+from followup.features import FEATURE_COLS as FACE_COLS
+from followup.text_chains import TEXT_FEATURE_COLS
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "results" / "followup"
 CLASSES = ["NAME", "DESC", "PRN"]
+FEATURE_COLS = FACE_COLS          # set in main() by --variant
+TAG = ""
 
 
-def load() -> pd.DataFrame:
-    df = pd.read_csv(OUT / "features.csv")
-    rule = pd.read_csv(OUT / "rule_preds.csv")
+def load(features="features.csv", rule="rule_preds.csv") -> pd.DataFrame:
+    df = pd.read_csv(OUT / features)
+    rule = pd.read_csv(OUT / rule)
     df = df.merge(rule, on=["dataset", "seq_id", "anno_idx", "char_id"], how="left")
     df = df[df.label.isin(CLASSES)].copy()
     df["y"] = df.label.map({c: i for i, c in enumerate(CLASSES)})
@@ -106,7 +111,16 @@ def evaluate(train: pd.DataFrame, test: pd.DataFrame) -> tuple[dict, np.ndarray 
 
 
 def main():
-    df = load()
+    global FEATURE_COLS, TAG
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--variant", choices=["face", "text"], default="face",
+                    help="face: labels/features via pred_ids (features.csv); text: transcript-only chains")
+    a = ap.parse_args()
+    if a.variant == "text":
+        FEATURE_COLS, TAG = TEXT_FEATURE_COLS, "text_"
+        df = load("text_features.csv", "text_rule_preds.csv")
+    else:
+        df = load()
     results = {"protocol_A_pooled_cv": {}, "protocol_B_leave_one_dataset_out": {}}
     imps = []
 
@@ -138,11 +152,11 @@ def main():
         results["protocol_B_leave_one_dataset_out"][ds] = res
 
     imp = pd.DataFrame({"feature": FEATURE_COLS, "importance": np.mean(imps, axis=0)})
-    imp.sort_values("importance", ascending=False).to_csv(OUT / "lgbm_importance.csv", index=False)
-    (OUT / "eval_results.json").write_text(json.dumps(results, indent=2))
+    imp.sort_values("importance", ascending=False).to_csv(OUT / f"{TAG}lgbm_importance.csv", index=False)
+    (OUT / f"{TAG}eval_results.json").write_text(json.dumps(results, indent=2))
 
     # markdown summary
-    lines = ["# Learned selector vs rule planner (English silver labels)", ""]
+    lines = [f"# Learned selector vs rule planner ({'text-only chains' if TAG else 'face-based (pred_ids)'} silver labels)", ""]
     for proto, block in results.items():
         lines += [f"## {proto}", "",
                   "| split | n | model | acc3 | F1 macro3 | acc PRN/non | F1 PRN | pred PRN% | gold PRN% |",
@@ -158,7 +172,7 @@ def main():
     lines += ["## LightGBM feature importance (top 12, mean split count over folds)", ""]
     for _, r in imp.sort_values("importance", ascending=False).head(12).iterrows():
         lines.append(f"- {r.feature}: {r.importance:.0f}")
-    (OUT / "eval_summary.md").write_text("\n".join(lines))
+    (OUT / f"{TAG}eval_summary.md").write_text("\n".join(lines))
     print("\n".join(lines))
 
 
