@@ -8,6 +8,8 @@ except LookupError:
     nltk.download('punkt_tab')
 from nltk.tokenize import sent_tokenize
 
+from reference_planner import CharState, ReferencePlanner, RulePlanner
+
 
 class CharacterMemoryBank:
     """
@@ -75,7 +77,7 @@ class CharacterMemoryBank:
     ANCHOR_INTERVAL = 4  # re-anchor character name after this many consecutive ADs
 
     def __init__(self, char_gender: dict = None, char_names: dict = None,
-                 char_descriptions: dict = None):
+                 char_descriptions: dict = None, planner: ReferencePlanner = None):
         # {char_id: {'last_seen_ad_idx': int, 'last_action': str, 'consecutive_ads': int}}
         self.characters = {}
         self.recent_history = []           # rolling list of last N ADs
@@ -86,6 +88,10 @@ class CharacterMemoryBank:
         self.char_gender = char_gender or {}
         self.char_names = char_names or {}  # {actor_id: role_name}
         self.char_descriptions = char_descriptions or {}  # {actor_id: physical_description}
+        # Decision layer. Default = the thesis rule planner; pass any other
+        # ReferencePlanner (e.g. a learned one) to swap the decision logic
+        # while keeping state tracking, history and prompt formatting intact.
+        self.planner = planner or RulePlanner(self.char_gender, self.ANCHOR_INTERVAL)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -123,36 +129,10 @@ class CharacterMemoryBank:
 
     def _is_pronoun_ambiguous_for(self, char_id, current_ids: list,
                                   prev_ids: list) -> bool:
-        """Return True if a pronoun for `char_id` would be ambiguous.
-
-        Competitor set = (current_ids ∪ prev_ids) − {char_id}.
-
-        Same-AD competitors model the within-shot case ("Hans and Karl
-        argue — er …" → which one?).
-        Previous-AD competitors model the cross-AD case ("AD N: Hans
-        sits down. AD N+1: Karl reads — er …" → listener still has
-        Hans as the active male antecedent).
-
-        Conservative fallbacks (return True when uncertain):
-          * `char_gender` map is empty (no gender info at all).
-          * `char_id`'s own gender is unknown.
-          * any competitor has unknown gender.
-        Otherwise → True iff any competitor shares `char_id`'s gender.
-        """
-        competitors = set(str(c) for c in current_ids) | set(str(c) for c in prev_ids)
-        competitors.discard(str(char_id))
-        if not competitors:
-            return False
-        if not self.char_gender:
-            return True  # no gender info → conservative
-        my_gender = self.char_gender.get(str(char_id))
-        if my_gender is None:
-            return True  # own gender unknown → conservative
-        for comp in competitors:
-            comp_gender = self.char_gender.get(comp)
-            if comp_gender is None or comp_gender == my_gender:
-                return True
-        return False
+        """Kept for backward compatibility; the logic lives in RulePlanner."""
+        planner = self.planner if isinstance(self.planner, RulePlanner) \
+            else RulePlanner(self.char_gender, self.ANCHOR_INTERVAL)
+        return planner.is_pronoun_ambiguous_for(char_id, current_ids, prev_ids)
 
     # ------------------------------------------------------------------
     # Public API
@@ -187,28 +167,23 @@ class CharacterMemoryBank:
         for char_id in char_ids:
             display = self._display_name(char_id)
 
-            if char_id in self.characters:
-                gap = ad_idx - self.characters[char_id]["last_seen_ad_idx"]
-                last_action = self.characters[char_id]["last_action"]
-                prev_consecutive = self.characters[char_id]["consecutive_ads"]
-                consecutive = prev_consecutive + 1 if gap == 1 else 1
+            entry = self.characters.get(char_id)
+            state = (CharState(entry["last_seen_ad_idx"], entry["consecutive_ads"])
+                     if entry else None)
+            decision = self.planner.decide(char_id, ad_idx, state, char_ids, prev_char_ids)
+            flag = decision.flag
 
-                if self._is_pronoun_ambiguous_for(char_id, char_ids, prev_char_ids):
-                    flag = "USE NAME — same-gender competitor present, pronoun is ambiguous"
-                    consecutive_out = 0  # name-use period: no pronoun chain being built
-                elif consecutive >= self.ANCHOR_INTERVAL:
-                    flag = f"USE NAME — memory anchor after {consecutive} consecutive ADs"
-                    consecutive_out = 0  # reset so next anchor fires after ANCHOR_INTERVAL more ADs
-                elif gap == 1:
-                    flag = "CONTINUING — pronoun ok"
-                    consecutive_out = consecutive
-                else:
-                    flag = "REINTRODUCE — use name or description"
-                    consecutive_out = 0  # name event: same as ambiguous/anchor — don't immediately re-anchor
-
+            if decision.is_first:
+                desc_hint = self._description_hint(char_id)
+                status_parts.append(
+                    f"  - {display}: first appearance. [{flag}]{desc_hint}"
+                )
+            else:
+                gap = decision.gap
+                last_action = entry["last_action"]
                 desc_hint = (
                     self._description_hint(char_id)
-                    if ("REINTRODUCE" in flag or "USE NAME" in flag)
+                    if decision.needs_description_hint
                     else ""
                 )
                 # Only emit `Last known action` when it adds info beyond the
@@ -224,23 +199,13 @@ class CharacterMemoryBank:
                     status_parts.append(
                         f"  - {display}: last seen {gap} AD(s) ago. [{flag}]{desc_hint}"
                     )
-                self.characters[char_id] = {
-                    "last_seen_ad_idx": ad_idx,
-                    "last_action": self._truncate_to_sentence(text_pred.strip()),
-                    "consecutive_ads": consecutive_out,
-                }
-            else:
-                desc_hint = self._description_hint(char_id)
-                status_parts.append(
-                    f"  - {display}: first appearance. [REINTRODUCE — use name if known]{desc_hint}"
-                )
-                self.characters[char_id] = {
-                    "last_seen_ad_idx": ad_idx,
-                    "last_action": self._truncate_to_sentence(text_pred.strip()),
-                    # Name event: align with REINTRODUCE / ambiguous / anchor —
-                    # the next CONTINUING AD starts the pronoun chain at 1.
-                    "consecutive_ads": 0,
-                }
+            self.characters[char_id] = {
+                "last_seen_ad_idx": ad_idx,
+                "last_action": self._truncate_to_sentence(text_pred.strip()),
+                # Name events (first / REINTRODUCE / USE NAME) store 0 so the
+                # next CONTINUING AD starts the pronoun chain at 1.
+                "consecutive_ads": decision.consecutive_out,
+            }
 
         char_status = (
             "\n".join(status_parts)

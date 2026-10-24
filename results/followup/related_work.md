@@ -1,0 +1,48 @@
+# Related work: learned reference-form selection for AD (survey 2026-10-24)
+
+Scope: 2024–2026 plus three older anchors. Every entry was opened via its abstract page or HTML; two (AutoAD III dataset details) rely on the paper body and should be re-checked before citing specifics.
+
+| Paper | Core idea | Relevance to learned reference-form selection | Overlap risk |
+|---|---|---|---|
+| AutoAD II (ICCV 2023) [2310.06838](https://arxiv.org/abs/2310.06838) | Character bank (name + actor face) feeds a VLM deciding who/when/what. | Frames "who" as identity prediction; no name/description/pronoun choice. | Low |
+| AutoAD III (CVPR 2024) [2404.14412](https://arxiv.org/abs/2404.14412) | CMD-AD and TV-AD datasets, Q-former AD model, CRITIC (character identity) and LLM-AD-eval metrics. | Two of the three silver-label sources; CRITIC is the natural identity baseline metric. | Low |
+| AutoAD-Zero (ACCV 2024) [2407.15850](https://arxiv.org/abs/2407.15850) | Training-free two stage: VLM with face circles + names in prompt, LLM condenses. | Names injected by prompting; mention form left to the LLM. | Low |
+| Uni-AD (2024/25) [2403.12922](https://arxiv.org/abs/2403.12922) | Interleaved video/text/character-bank input; character refinement picks main characters. | Learns which characters to name, not how to refer to them over time. | Low–medium |
+| DistinctAD (CVPR 2025) [CVF](https://openaccess.thecvf.com/content/CVPR2025/html/Fang_DistinctAD_Distinctive_Audio_Description_Generation_in_Contexts_CVPR_2025_paper.html) | Contextual EM attention and a loss penalising words repeated from neighbouring ADs. | Anti-repetition pushes against repeating a name; no linguistic model of reference. | Low |
+| Shot-by-Shot (ICCV 2025) [2504.01020](https://arxiv.org/abs/2504.01020v2) | Shot-level units, film grammar add-ons, action score, AD assistant protocol. | The thesis base system; character handling not addressed. | Low (base) |
+| FocusedAD (2025) [2504.12157](https://arxiv.org/abs/2504.12157v2) | Character perception module, dynamic prior from previous ADs/subtitles via soft prompts; Cinepile-AD. | Carries prior-AD context into generation; form still implicit in the decoder. | Medium |
+| CoherentAD (Oct 2025, VGG/IIIT) [2510.25440](https://arxiv.org/abs/2510.25440) | Multiple candidates per interval, auto-regressive selection with LLM scorers; StoryRecall metric. | Closest "coherent AD sequence" competitor; identity-blind, no pronoun/description modelling. | High on framing, low on mechanism |
+| READ (Jun 2026) [2606.22766](https://arxiv.org/abs/2606.22766) | RL for AD (Qwen3-VL-8B) with a gated LM-probability coherence reward and anti-copy masking; MAD-Eval, CMD-AD, TV-AD. | Validates RL on the same datasets; its reward is reference-blind and masking may penalise correct name repetition. | Medium–high if RL/DPO is used |
+| StrAD (Aug 2026) [2608.12549](https://arxiv.org/abs/2608.12549) | Streaming dense captioning over full videos; authors note weak narrative coherence. | Long-form setting where reference errors compound. | Low |
+| REFRAMED (Aug 2026, Edinburgh) [2608.09765](https://arxiv.org/abs/2608.09765) | What/when to describe in dialogue gaps; 206 movies with professional AD (US + UK tracks), subtitles, screenplays. | Dual AD tracks are a gold source for how professionals vary reference form. | Low–medium (data) |
+| What, When, and How (Sep 2026) [2609.30121](https://arxiv.org/abs/2609.30121v1) | LLM proposes elements, MILP selects and schedules under temporal constraints. | "How" is compression only; reference form is a natural extra decision variable. | Low |
+| Cue2Narrate (Sep 2026) [2609.01725](https://arxiv.org/abs/2609.01725) | Dual-head localiser + LoRA VLM with description ranking loss; LongLSMDC. | Long clips, no character reference treatment. | Low |
+| ADQA (EMNLP 2025) [2510.00808](https://arxiv.org/abs/2510.00808) | Aligns two AD tracks; QA benchmark on visual appreciation and narrative understanding. | Functional evaluation where ambiguous reference should hurt narrative QA. | Low (eval) |
+| AD quality control with VLM raters (2026) [2602.01390](https://arxiv.org/abs/2602.01390) | IRT workflow comparing VLM and human raters against expert rubric. | Route to LLM-as-judge for reference coherence. | Low |
+| Character-centric animated movies (Sep 2025, VGG) [2509.12204](https://arxiv.org/abs/2509.12204) | Audio-visual auto-built character banks; CMD-AM. | Improves upstream IDs that CMB-AD consumes. | Low |
+| Andha-Dhun: Hindi AD (2026) [2607.06457](https://arxiv.org/abs/2607.06457) | Human Hindi AD; translation loses diversity and cultural adaptation. | Reference conventions do not transfer by MT. | Low |
+| SwissADT (NAACL 2025 Industry) [2411.14967](https://arxiv.org/abs/2411.14967) | LLM-based AD translation DE/FR/IT/EN with optional video. | UZH multilingual line is translation-centred; generation-side form is open. | Low |
+| AD generation review (Oct 2024, Ebling group) [2410.08860](https://arxiv.org/abs/2410.08860) | Survey of generative tech for AD. | Related-work scaffold. | Low |
+| StoryTeller (2024/25) [2411.07076](https://arxiv.org/abs/2411.07076) | Global audio-visual character identification; name or descriptive label fallback for speakers. | Hard-coded name-vs-description fallback; no pronouns, no learned policy. | Medium |
+| MICap (CVPR 2024) [2405.11483](https://arxiv.org/abs/2405.11483) | Joint identity assignment and captioning with local IDs; iSPICE metric. | Closest identity-sensitive caption metric; local IDs as intermediate representation. | Low–medium |
+| RICE (Oct 2025) [2510.06973](https://arxiv.org/abs/2510.06973) | ID matching across frames in long video captioning. | Upstream of a reference-form selector. | Low |
+| Grounded and coreferent visual stories (Liu, Lapata, Keller 2024/25) [2409.13555](https://arxiv.org/abs/2409.13555v2) | VIST with visual + textual coreference chains; fine-tuned storyteller; coreference consistency metrics. | Closest learned coreferent-mention work in visual narrative; metrics portable to AD. | Medium |
+| StoryReasoning (May 2025) [2505.10292](https://arxiv.org/abs/2505.10292v2) | CoT scene tables with cross-frame re-ID; grounding against referential hallucination. | Grounding-based, not form-based. | Low |
+| Coreference as indicator of context scope (GEM² @ ACL 2025) [ACL](https://aclanthology.org/2025.gem-1.67) | Metrics comparing human vs MLLM coreference patterns in visual storytelling. | Ready-made coreference-pattern metrics. | Low (eval) |
+| Reference production of LLMs (INLG 2025) [ACL](https://aclanthology.org/2025.inlg-main.12/) | LLM referential form diverges from human patterns on WebNLG. | Direct evidence that LLMs do not pick referential form like humans. | Low |
+| Experimental vs in-corpus RE variation (LREC-COLING 2024) [PDF](https://aclanthology.org/2024.lrec-main.597.pdf) | Form distributions from OntoNotes vs crowd vs GPT-4. | Template for deriving form distributions from corpora (silver labels). | Low |
+| Neural referential form selectors (INLG 2021) [ACL](https://aclanthology.org/2021.inlg-1.15) | Probing of neural RFS: referential status and syntax learned, discourse structure not. | Canonical learned-RFS formulation; direct ancestor. | Medium |
+| Intrinsic task-based evaluation for REG (2024) [2402.07432](https://arxiv.org/abs/2402.07432) | Meta-tasks for human REG evaluation. | Reusable human-eval protocol. | Low |
+| RefOI: VLMs not pragmatically competent in REG (2025) [2504.16060](https://arxiv.org/abs/2504.16060v2) | VLMs over-specify, fail uniqueness. | Bears on the DESCRIPTION option. | Low |
+| REG in visually grounded dialogue (2024) [2409.05721](https://arxiv.org/abs/2409.05721v1) | Generate-and-rerank REs by discriminativeness in context. | Rerank-by-comprehension as an alternative to a classifier. | Low |
+
+## Takeaways
+
+- No paper learns reference form in AD. Across the whole AD line, character handling stops at identity prediction. NAME vs DESCRIPTION vs PRONOUN is nowhere modelled or evaluated.
+- Coherence is being attacked with generic signals: CoherentAD (candidate selection) and READ (RL with LM-probability reward). Both are identity-blind. A reference-aware selector or reward is the differentiator; READ already validates RL on MAD-Eval/CMD-AD/TV-AD.
+- Silver labels from gold AD have precedent (Ellison and Same 2024; Liu, Lapata and Keller 2024/25) but have not been applied to AD. REFRAMED's dual US/UK tracks and ADQA's two-track alignment give a way to measure how much professionals disagree on form (a ceiling for silver-label noise).
+- Text-only referential form selection is known to miss discourse-level structure (Chen, Same, van Deemter 2021; INLG 2025). Visual and AD-history features (time since last mention, co-presence, shot change, same-gender competitors, ID confidence) are new input for the task.
+- Noisy character IDs are a selling point: FocusedAD, StoryTeller, RICE improve upstream ID; a selector that falls back to description or pronoun under low ID confidence is complementary and testable under controlled noise.
+- Evaluation gap: CRITIC and iSPICE check whether the right person is mentioned, not whether the form is appropriate. Reference-form accuracy against silver labels plus a pronoun-ambiguity probe via ADQA-style QA would be a contribution on its own.
+- Multilingual angle is open: SwissADT and Andha-Dhun are translation-centred; nobody looks at how pronoun/name conventions differ across languages.
+- Positioning: cite and contrast CoherentAD (high framing overlap), READ (if RL is used), Chen/Same/van Deemter 2021 and Liu/Lapata/Keller 2024 (direct ancestors), StoryTeller and FocusedAD (hard-coded fallback or context priors).
