@@ -30,3 +30,9 @@ results/human_eval/
 results/eval_reports/
 results/test/
 .env
+
+# Follow-up: regenerated intermediates (python -m followup.silver_labels / text_chains / text_inputs)
+# and offline dry-run outputs. Only summaries, JSON results and Kaggle OOF arrays are tracked.
+results/followup/*.csv
+!results/followup/*importance.csv
+results/followup/encoder_dryrun*
