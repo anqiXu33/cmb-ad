@@ -17,6 +17,8 @@ Usage on the MacBook (Apple GPU via MPS):
     python -m followup.finetune_encoder --model microsoft/deberta-v3-small   # needs: pip install sentencepiece
     python -m followup.finetune_encoder --dry_run                # tiny random model, no download
 
+On Kaggle / Colab (CUDA GPU):  add --fp16
+
 Rough timing on an M1 Pro (16 GB), distilroberta-base, max_len 192, 3 epochs:
 ~5-8 min per fold. Close other heavy apps; memory peaks around 4 GB.
 
@@ -128,15 +130,20 @@ def run_fold(args, train_df, test_df, device, all_texts):
     sched = torch.optim.lr_scheduler.LambdaLR(
         opt, lambda s: min(1.0, (s + 1) / max(1, warm)) * max(0.0, (total - s) / max(1, total - warm)))
 
+    use_amp = args.fp16 and device.type == "cuda"
+    scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
     step, t0 = 0, time.time()
     for ep in range(args.epochs):
         model.train()
         for batch in tr:
             batch = {k: v.to(device) for k, v in batch.items()}
-            loss = model(**batch).loss
-            loss.backward()
+            with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=use_amp):
+                loss = model(**batch).loss
+            scaler.scale(loss).backward()
+            scaler.unscale_(opt)
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            opt.step()
+            scaler.step(opt)
+            scaler.update()
             sched.step()
             opt.zero_grad()
             step += 1
@@ -153,6 +160,10 @@ def run_fold(args, train_df, test_df, device, all_texts):
         for batch in te:
             batch.pop("labels")
             batch = {k: v.to(device) for k, v in batch.items()}
+            with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=use_amp):
+                logits = model(**batch).logits
+            probs.append(torch.softmax(logits.float(), -1).cpu().numpy())
+            continue
             probs.append(torch.softmax(model(**batch).logits.float(), -1).cpu().numpy())
     return np.concatenate(probs)
 
@@ -168,6 +179,7 @@ def main():
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--max_steps", type=int, default=0, help="debug: stop each fold after N steps")
     ap.add_argument("--dry_run", action="store_true", help="tiny random model, no download")
+    ap.add_argument("--fp16", action="store_true", help="mixed precision on CUDA (Kaggle / Colab GPUs)")
     args = ap.parse_args()
     if args.dry_run:
         args.lr = max(args.lr, 1e-3)
