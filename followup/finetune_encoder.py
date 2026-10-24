@@ -180,22 +180,34 @@ def main():
     ap.add_argument("--max_steps", type=int, default=0, help="debug: stop each fold after N steps")
     ap.add_argument("--dry_run", action="store_true", help="tiny random model, no download")
     ap.add_argument("--fp16", action="store_true", help="mixed precision on CUDA (Kaggle / Colab GPUs)")
+    ap.add_argument("--protocol", choices=["cv", "lodo"], default="cv",
+                    help="cv: 5-fold GroupKFold by sequence (datasets mixed); "
+                         "lodo: leave one dataset out (train on two datasets, test on the third)")
     args = ap.parse_args()
     if args.dry_run:
         args.lr = max(args.lr, 1e-3)
 
     device = pick_device()
-    tag = "dryrun" if args.dry_run else args.model.split("/")[-1]
+    tag = ("dryrun" if args.dry_run else args.model.split("/")[-1]) + ("_lodo" if args.protocol == "lodo" else "")
     print(f"device={device}  model={'tiny-random' if args.dry_run else args.model}", flush=True)
 
     df = load()
     all_texts = (df.context + " " + df.current).tolist()
-    gkf = GroupKFold(n_splits=5)
-    splits = list(gkf.split(df, df.y, groups=df.seq_id))[: args.folds]
+    if args.protocol == "lodo":
+        ds_arr = df.dataset.to_numpy()
+        held = sorted(df.dataset.unique())[: args.folds] if args.folds < 3 else sorted(df.dataset.unique())
+        splits = [(np.where(ds_arr != d)[0], np.where(ds_arr == d)[0]) for d in held]
+        split_names = [f"held out {d}" for d in held]
+        full = len(held) == 3
+    else:
+        gkf = GroupKFold(n_splits=5)
+        splits = list(gkf.split(df, df.y, groups=df.seq_id))[: args.folds]
+        split_names = [f"fold {k}" for k in range(len(splits))]
+        full = args.folds == 5
 
     oof = np.full((len(df), len(CLASSES)), np.nan)
     for k, (tr, te) in enumerate(splits):
-        print(f"fold {k}: train {len(tr)}  test {len(te)}", flush=True)
+        print(f"{split_names[k]}: train {len(tr)}  test {len(te)}", flush=True)
         oof[te] = run_fold(args, df.iloc[tr], df.iloc[te], device, all_texts)
     np.save(OUT / f"encoder_{tag}_oof.npy", oof)
 
@@ -205,7 +217,7 @@ def main():
     # stacking: LightGBM on discourse features + encoder OOF probabilities,
     # evaluated on the same folds (only over rows that have OOF predictions)
     stack_pred = np.full(len(df), -1)
-    if args.folds == 5:
+    if full:
         X = np.hstack([df[TEXT_FEATURE_COLS].values, oof])
         for tr, te in splits:
             m = _lgbm()
@@ -223,12 +235,25 @@ def main():
     rows = {"rule": scores(y[done], rule_pred[done]),
             "lgbm_feat": scores(y[done], feat_pred[done]),
             f"encoder ({tag})": scores(y[done], oof[done].argmax(1))}
-    if args.folds == 5:
+    if full:
         rows[f"stack_lgbm (features + {tag})"] = scores(y[done], stack_pred[done])
     rows["rule"]["acc3"] = float(np.mean([(p == t) or (p == 0 and t == 1)
                                           for p, t in zip(rule_pred[done], y[done])]))
 
-    L = [f"# Encoder fine-tuning ({tag}), {done.sum()} evaluated rows, folds={args.folds}", "",
+    # per-dataset breakdown (for lodo: each dataset scored by models that never saw it)
+    per_ds = {}
+    for d in sorted(df.dataset.unique()):
+        k = done & (df.dataset.to_numpy() == d)
+        if not k.any():
+            continue
+        per_ds[d] = {"n": int(k.sum()), "rule": scores(y[k], rule_pred[k]),
+                     "lgbm_feat": scores(y[k], feat_pred[k]),
+                     "encoder": scores(y[k], oof[k].argmax(1))}
+        if full:
+            per_ds[d]["stack_lgbm"] = scores(y[k], stack_pred[k])
+
+    proto = "leave-one-dataset-out" if args.protocol == "lodo" else f"5-fold GroupKFold, folds run={args.folds}"
+    L = [f"# Encoder fine-tuning ({tag}), {done.sum()} evaluated rows, {proto}", "",
          f"device={device}, epochs={args.epochs}, bs={args.bs}, lr={args.lr}, max_len={args.max_len}", "",
          "| model | acc3 | F1 macro3 | acc PRN/non | F1 PRN | F1 DESC | pred PRN% |",
          "| --- | --- | --- | --- | --- | --- | --- |"]
@@ -236,6 +261,16 @@ def main():
         L.append(f"| {name} | {s['acc3']:.3f} | {s['f1_macro3']:.3f} | {s['acc_bin']:.3f} | "
                  f"{s['f1_prn']:.3f} | {s['f1_desc']:.3f} | {100 * s['pred_prn_rate']:.1f} |")
     L.append(f"\ngold PRN% = {100 * (y[done] == 2).mean():.1f}")
+    L += ["", "## Per dataset" + (" (each scored by models trained on the other two)" if args.protocol == "lodo" else ""), "",
+          "| dataset | n | model | acc PRN/non | F1 PRN | pred PRN% | gold PRN% |",
+          "| --- | --- | --- | --- | --- | --- | --- |"]
+    for d, r in per_ds.items():
+        k = done & (df.dataset.to_numpy() == d)
+        for name in [m for m in ("rule", "lgbm_feat", "encoder", "stack_lgbm") if m in r]:
+            s_ = r[name]
+            L.append(f"| {d} | {r['n']} | {name} | {s_['acc_bin']:.3f} | {s_['f1_prn']:.3f} | "
+                     f"{100 * s_['pred_prn_rate']:.1f} | {100 * (y[k] == 2).mean():.1f} |")
+    rows["per_dataset"] = per_ds
     if args.dry_run:
         L.append("\nDRY RUN: tiny random model, numbers are meaningless; this only checks the pipeline.")
     (OUT / f"encoder_{tag}_summary.md").write_text("\n".join(L))
