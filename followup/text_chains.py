@@ -6,9 +6,16 @@ Mentions are resolved to characters from the text alone:
     NAME  lexicon match against the cast list (ties broken by recency)
     PRN   most recent mention, within the last MAX_LOOKBACK ADs, of a
           character with compatible gender; a NAME earlier in the same AD wins
-    DESC  same rule but only within the last DESC_LOOKBACK ADs (descriptions
-          often introduce unnamed people, which we do not want to force onto a
-          known character)
+    DESC  bound ONLY when its content words occur in exactly one cast member's
+          role string ("the witch" -> "Horned Witch"). Recency binding was
+          tried and dropped: on a 30-item check about two thirds were wrong,
+          because describers use "the driver" precisely for someone OTHER than
+          the protagonist just mentioned. Indefinite ("a man"), relational
+          ("her brother"), non-individual ("the couple") descriptions and
+          "a X ... the X" anaphors of a new person are never bound.
+          Consequence: the surviving DESC labels are almost all role-named
+          minor characters (Farmer, Co-Pilot), i.e. NOT a genuine name-vs-
+          description choice. Treat DESC results with that in mind.
 
 Unresolved PRN / DESC mentions are dropped (counted in the report). The
 resolver is the classic recency + gender-agreement heuristic (Hobbs-style),
@@ -41,6 +48,42 @@ OUT = ROOT / "results" / "followup"
 
 MAX_LOOKBACK = 4      # ADs a pronoun may reach back
 DESC_LOOKBACK = 2     # ADs a description may reach back
+INDEF_BLOCK = 3       # "a man" ... "the man" within this many ADs = the new person
+
+# --- description filters (precision over recall) ---------------------------
+# A description only becomes a silver label when it re-describes a character
+# that is already in the listener's mind. Everything below is dropped:
+_INDEF = {"a", "an", "another", "some", "one", "two", "three", "several"}
+_NON_INDIVIDUAL = {"couple", "twins", "siblings", "crowd", "family", "group", "people",
+                   "kids", "children", "baby", "infant", "toddler", "pair", "trio", "team"}
+_KINSHIP = {"mother", "mom", "father", "dad", "son", "daughter", "brother", "sister",
+            "husband", "wife", "boyfriend", "girlfriend", "grandmother", "grandma",
+            "grandfather", "grandpa", "stepfather", "stepmother", "uncle", "aunt",
+            "cousin", "nephew", "niece", "fiance", "fiancee", "parents"}
+
+
+_DESC_STOP = {"the", "a", "an", "his", "her", "their", "its", "young", "old", "man", "woman",
+              "guy", "boy", "girl", "lady", "person", "figure", "mr", "mrs", "ms", "dr", "of",
+              "and", "s", "little", "big", "tall", "short", "other", "first", "second", ""}
+
+
+def _desc_tokens(m: Mention) -> list[str]:
+    return [t.strip(".,'’\"").lower() for t in m.text.split()]
+
+
+def desc_filter_reason(m: Mention, i: int, indef_heads: list[tuple[int, str]]) -> str | None:
+    """Why a DESC mention must NOT be bound to a known character (None = may bind)."""
+    toks = _desc_tokens(m)
+    head = m.head_lemma or (toks[-1] if toks else "")
+    if toks and toks[0] in _INDEF:
+        return "indefinite"                 # introduces a new person
+    if any(t in _NON_INDIVIDUAL for t in toks):
+        return "non_individual"
+    if head in _KINSHIP or any(t in _KINSHIP for t in toks):
+        return "relational"                 # "her brother", "Pete's mom"
+    if any(i - j <= INDEF_BLOCK and h == head for j, h in indef_heads):
+        return "anaphor_of_new"             # "a man ..." -> "the man ..."
+    return None
 FORMS = ["NAME", "DESC", "PRN", "none"]
 ANCHOR_INTERVAL = 4
 
@@ -75,6 +118,8 @@ def text_gender(charbank: list[dict], ad_mentions: list[list[Mention]]) -> dict[
 def resolve_sequence(seq: pd.DataFrame, charbank: list[dict]):
     ext = EnglishMentionExtractor(charbank)
     role_of = {str(c["id"]): c.get("role") or "" for c in charbank}
+    role_toks = {cid: {w.strip(".,'’\"()").lower() for w in r.replace("-", " ").split()} - _DESC_STOP
+                 for cid, r in role_of.items()}
     ad_mentions = [ext.extract(t) for t in seq["text"]]
     gender = text_gender(charbank, ad_mentions)
 
@@ -82,6 +127,7 @@ def resolve_sequence(seq: pd.DataFrame, charbank: list[dict]):
     rows, stats = [], Counter()
     prev_thread = None
     history: list[tuple[int, str]] = []       # (ad_index, char) mention events in order
+    indef_heads: list[tuple[int, str]] = []   # (ad_index, head noun) of "a X" introductions
 
     for i, (ad, ms) in enumerate(zip(seq.itertuples(index=False), ad_mentions)):
         cur_thread = getattr(ad, "thread", None)
@@ -100,17 +146,35 @@ def resolve_sequence(seq: pd.DataFrame, charbank: list[dict]):
                 elif cands:
                     cid = max(cands, key=lambda c: last_mention_ad.get(c, -1))
                 stats["NAME"] += 1
+            elif m.label == "DESC":
+                reason = desc_filter_reason(m, i, indef_heads)
+                toks = _desc_tokens(m)
+                if toks and toks[0] in _INDEF:
+                    indef_heads.append((i, m.head_lemma or toks[-1]))
+                if reason:
+                    stats[f"DESC_filtered_{reason}"] += 1
+                    continue
+                # Recency does NOT work for descriptions: describers use "the
+                # driver" precisely for someone other than the protagonist just
+                # mentioned. Bind only when the description's content words
+                # occur in exactly one cast member's role string ("the witch"
+                # -> "Horned Witch", "the staff sergeant" -> "SSgt. ... ").
+                content = {t for t in toks if t not in _DESC_STOP}
+                hits = [c for c, rt in role_toks.items()
+                        if content and (content & rt) and c not in resolved_in_ad]
+                if len(hits) == 1:
+                    cid = hits[0]
+                stats["DESC_resolved" if cid else "DESC_unresolved"] += 1
             else:
                 g = mention_gender(m)
-                lookback = MAX_LOOKBACK if m.label == "PRN" else DESC_LOOKBACK
                 # 1) a compatible character already resolved earlier in this AD
                 same_ad = [c for c in resolved_in_ad if _compatible(g, gender.get(c))]
                 if same_ad:
                     cid = same_ad[0]
                 else:
-                    # 2) most recent compatible character in the last `lookback` ADs
+                    # 2) most recent compatible character in the last MAX_LOOKBACK ADs
                     for j, c in reversed(history):
-                        if i - j > lookback:
+                        if i - j > MAX_LOOKBACK:
                             break
                         if _compatible(g, gender.get(c)):
                             cid = c
