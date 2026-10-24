@@ -36,3 +36,5 @@ results/test/
 results/followup/*.csv
 !results/followup/*importance.csv
 results/followup/encoder_dryrun*
+results/followup/llm_*dryrun*
+results/followup/baselines_oof_*.npz

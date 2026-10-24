@@ -51,3 +51,11 @@ rebuilds the data, trains with `--fp16`, and pushes the summary back to the bran
 Open `kaggle/name_heard_reframed.ipynb` on Kaggle (Accelerator None, Internet On), Run all.
 It downloads REFRAMED train+validation (CC BY-NC 4.0), runs `python -m followup.name_heard`,
 and pushes only `results/followup/name_heard_summary.md` / `.json` back to this branch.
+
+## LLM experiments (Kaggle, GPU T4)
+
+Open `kaggle/llm_experiments.ipynb` on Kaggle (GPU T4 x2, Internet On, GITHUB_TOKEN secret), Save & Run All.
+- `followup/llm_zeroshot.py`: Qwen2.5-7B-Instruct (4-bit), no training, NAME vs PRONOUN from next-token logits.
+- `followup/llm_finetune.py`: Qwen2.5-1.5B QLoRA classifier, 10 previous AD lines, fold 0.
+Both compare against the rule, lgbm+role and stack+role on the same rows, overall and per syntactic position.
+Offline smoke tests: `--dry_run`.

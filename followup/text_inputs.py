@@ -41,8 +41,13 @@ def _name_regex(role: str):
     return re.compile(r"\b(" + "|".join(re.escape(t) for t in toks) + r")\b(?:['’]s)?")
 
 
-def build_inputs(df: pd.DataFrame, ads: pd.DataFrame, k: int = K_CONTEXT) -> pd.DataFrame:
-    """Add `context` and `current` columns to df (rows of text_features.csv)."""
+def build_inputs(df: pd.DataFrame, ads: pd.DataFrame, k: int = K_CONTEXT,
+                 mask_name: bool = True, sep: str = SEP) -> pd.DataFrame:
+    """Add `context` and `current` columns to df (rows of text_features.csv).
+
+    mask_name=False keeps the target's name in the context (for prompting an
+    untrained LLM, which needs to see who was mentioned); the TARGET slot in
+    the current AD is always masked."""
     ads = ads.sort_values(["dataset", "seq_id", "start", "anno_idx"]).reset_index(drop=True)
     pos, texts = {}, {}
     for (ds, seq), g in ads.groupby(["dataset", "seq_id"], sort=False):
@@ -61,9 +66,9 @@ def build_inputs(df: pd.DataFrame, ads: pd.DataFrame, k: int = K_CONTEXT) -> pd.
         seq_texts = texts[(r.dataset, r.seq_id)]
         i = pos[(r.dataset, r.seq_id, r.anno_idx)]
         prev = seq_texts[max(0, i - k):i]
-        if rx is not None:
+        if rx is not None and mask_name:
             prev = [rx.sub(TGTNAME, s) for s in prev]
-        ctx_out.append(SEP.join(prev) if prev else "NOCONTEXT")
+        ctx_out.append(sep.join(prev) if prev else "NOCONTEXT")
 
         cur = str(r.text)
         a, b = int(r.m_start), int(r.m_start) + len(str(r.m_text))
@@ -74,7 +79,7 @@ def build_inputs(df: pd.DataFrame, ads: pd.DataFrame, k: int = K_CONTEXT) -> pd.
         # a possessive marker left after a masked NAME / DESC ("TARGET's chest")
         # would give the answer away vs. a masked "Her chest" -> drop it
         cur = re.sub(TARGET + r"['’]s\b", TARGET, cur)
-        if rx is not None:
+        if rx is not None and mask_name:
             cur = rx.sub(TGTNAME, cur)
         cur_out.append(cur)
     df = df.copy()
