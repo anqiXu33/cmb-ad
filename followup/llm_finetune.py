@@ -6,12 +6,14 @@ encoder) and a classification head predicts whether the describer used a
 pronoun. Only LoRA adapters and the head are trained; the base model is loaded
 in 4 bit on CUDA.
 
-Same 5-fold GroupKFold by sequence as every other model; by default only
-fold 0 is run (about an hour on a Kaggle T4 for a 1.5B model), and the
-reference models are scored on the same rows.
+Two protocols, as for every other model:
+    --protocol cv     5-fold GroupKFold by sequence; by default only fold 0
+    --protocol lodo   train on two datasets, test on the third; by default all 3
+About an hour per fold on a Kaggle T4 for a 1.5B model. The reference models
+are scored on the same rows under the same protocol.
 
 Kaggle (GPU T4, Internet on):
-    python -m followup.llm_finetune --model Qwen/Qwen2.5-1.5B --load_4bit --k 10 --folds 1
+    python -m followup.llm_finetune --model Qwen/Qwen2.5-1.5B --load_4bit --k 10 --protocol lodo
 Offline smoke test:
     python -m followup.llm_finetune --dry_run --folds 1 --max_steps 10
 """
@@ -125,7 +127,9 @@ def main():
     ap.add_argument("--model", default="Qwen/Qwen2.5-1.5B")
     ap.add_argument("--load_4bit", action="store_true")
     ap.add_argument("--k", type=int, default=10)
-    ap.add_argument("--folds", type=int, default=1, help="run the first N of the 5 folds")
+    ap.add_argument("--protocol", choices=["cv", "lodo"], default="cv")
+    ap.add_argument("--folds", type=int, default=0,
+                    help="run the first N splits (default: 1 for cv, all 3 for lodo)")
     ap.add_argument("--epochs", type=int, default=1)
     ap.add_argument("--bs", type=int, default=4)
     ap.add_argument("--accum", type=int, default=4)
@@ -140,26 +144,29 @@ def main():
     df = load_rows(k=a.k, mask_name=True)
     df["text"] = [to_text(r) for r in df.itertuples(index=False)]
     print(f"device={device}; {len(df)} rows; example input:\n{df.text.iloc[0]}\n", flush=True)
-    splits = folds(df)[: a.folds]
+    all_splits = folds(df, a.protocol)
+    n_run = a.folds or (1 if a.protocol == "cv" else len(all_splits))
+    splits = all_splits[:n_run]
     p = np.full(len(df), np.nan)
     pred_prior = np.zeros(len(df), int)
     for k, (tr, te) in enumerate(splits):
-        print(f"fold {k}: train {len(tr)}  test {len(te)}", flush=True)
+        test_ds = ",".join(sorted(df.dataset.iloc[te].unique()))
+        print(f"fold {k}: train {len(tr)}  test {len(te)} ({test_ds})", flush=True)
         p[te] = run_fold(a, df.iloc[tr], df.iloc[te], device, df.text.tolist())
         # threshold so the predicted pronoun rate equals the TRAINING fold's rate
         prior = float(df.y_bin.to_numpy()[tr].mean())
         pred_prior[te] = (p[te] > np.quantile(p[te], 1 - prior)).astype(int)
-    tag = "llm_finetune_" + ("dryrun" if a.dry_run else a.model.split("/")[-1])
+    tag = "llm_finetune_" + ("dryrun" if a.dry_run else a.model.split("/")[-1]) + ("_lodo" if a.protocol == "lodo" else "")
     np.save(f"results/followup/{tag}_probs.npy", p)
     mask = ~np.isnan(p)
-    preds = baseline_preds(df)
+    preds = {(k if k == "rule" else f"{k} ({a.protocol})"): v for k, v in baseline_preds(df, a.protocol).items()}
     preds["finetuned@0.5"] = (np.nan_to_num(p) > 0.5).astype(int)
     preds["finetuned@prior"] = pred_prior
     notes = [f"model: {'tiny random (dry run)' if a.dry_run else a.model}{' 4-bit QLoRA' if a.load_4bit else ' LoRA'}; "
-             f"{a.k} previous AD lines, target name masked; folds run: {a.folds} of 5; epochs {a.epochs}; "
+             f"{a.k} previous AD lines, target name masked; protocol {a.protocol}, splits run: {n_run} of {len(all_splits)}; epochs {a.epochs}; "
              f"lr {a.lr}; batch {a.bs}x{a.accum}; max_len {a.max_len}.",
              "finetuned@prior: threshold set per fold so the predicted pronoun rate equals the training fold's rate.",
-             "Reference models are 5-fold out-of-fold predictions on the same rows."]
+             f"Reference models: out-of-fold predictions under the same protocol ({a.protocol}) on the same rows."]
     if a.dry_run:
         notes.append("DRY RUN: numbers are meaningless; this only checks the pipeline.")
     print(report(df, mask, preds, "Fine-tuned LLM vs rule vs learned models (PRONOUN vs explicit)", notes, tag))

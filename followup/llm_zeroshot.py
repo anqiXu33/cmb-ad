@@ -11,6 +11,12 @@ Two decision rules are reported:
     zeroshot@prior      threshold set so the predicted pronoun rate equals the
                         pronoun rate of all OTHER rows (no labels of the scored
                         rows are used)
+    zeroshot@otherds    per dataset: threshold set so the predicted pronoun rate
+                        equals the pronoun rate of the OTHER two datasets, i.e.
+                        the same information a leave-one-dataset-out model has
+
+The model is never trained, so it cannot pick up a dataset's style; it is
+compared against the learned models under both protocols (cv and lodo).
 
 Kaggle (GPU T4, Internet on):
     python -m followup.llm_zeroshot --model Qwen/Qwen2.5-7B-Instruct --load_4bit --n 3000 --k 10
@@ -25,7 +31,7 @@ import time
 import numpy as np
 import torch
 
-from followup.llm_common import baseline_preds, load_rows, report, tiny_tokenizer
+from followup.llm_common import baselines_both, load_rows, report, tiny_tokenizer
 
 PROMPT = """Below are consecutive audio description (AD) lines from a film or TV episode, written for blind and partially sighted viewers.
 
@@ -119,13 +125,22 @@ def main():
 
     prior = float(df.y_bin.to_numpy()[~mask].mean())
     thr = float(np.quantile(p[idx], 1 - prior))
-    preds = baseline_preds(df)
+    preds = baselines_both(df)
     preds["zeroshot@0.5"] = (np.nan_to_num(p) > 0.5).astype(int)
     preds["zeroshot@prior"] = (np.nan_to_num(p) > thr).astype(int)
+    other = np.zeros(len(df), int)
+    ds, yb = df.dataset.to_numpy(), df.y_bin.to_numpy()
+    for d in np.unique(ds):
+        k = mask & (ds == d)
+        if k.sum():
+            rate = float(yb[ds != d].mean())
+            other[k] = (p[k] > np.quantile(p[k], 1 - rate)).astype(int)
+    preds["zeroshot@otherds"] = other
     notes = [f"model: {'tiny random (dry run)' if a.dry_run else a.model}{' 4-bit' if a.load_4bit else ''}; "
              f"{a.k} previous AD lines with names visible; {len(idx)} random rows of {len(df)}.",
              f"zeroshot@prior threshold = {thr:.3f} (pronoun rate of the unscored rows = {100 * prior:.1f}%).",
-             "Reference models are 5-fold out-of-fold predictions on the same rows."]
+             "zeroshot@otherds: per dataset, predicted pronoun rate = pronoun rate of the other two datasets.",
+             "Reference models: (cv) = 5-fold out-of-fold, (lodo) = trained on the other two datasets; same rows."]
     if a.dry_run:
         notes.append("DRY RUN: numbers are meaningless; this only checks the pipeline.")
     print(report(df, mask, preds, "Zero-shot LLM vs rule vs learned models (PRONOUN vs explicit)", notes, tag))

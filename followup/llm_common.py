@@ -6,7 +6,9 @@ against:
     rule        the thesis rule planner replayed on the text stream
     lgbm+role   LightGBM on discourse features + syntactic position (5-fold OOF)
     stack+role  lgbm+role + out-of-fold TF-IDF text probabilities (5-fold OOF)
-Folds are the same 5-fold GroupKFold by sequence used everywhere else.
+Two protocols, as everywhere else:
+    cv      5-fold GroupKFold by sequence (datasets mixed)
+    lodo    leave one dataset out: train on two datasets, test on the third
 """
 from __future__ import annotations
 
@@ -35,15 +37,18 @@ def load_rows(k: int = 10, mask_name: bool = True) -> pd.DataFrame:
     return df.reset_index(drop=True)
 
 
-def folds(df: pd.DataFrame):
+def folds(df: pd.DataFrame, protocol: str = "cv"):
+    if protocol == "lodo":
+        ds = df.dataset.to_numpy()
+        return [(np.where(ds != d)[0], np.where(ds == d)[0]) for d in sorted(df.dataset.unique())]
     return list(GroupKFold(n_splits=5).split(df, df.y, groups=df.seq_id))
 
 
-def baseline_preds(df: pd.DataFrame) -> dict[str, np.ndarray]:
-    """Binary OOF predictions of the reference models on all rows (cached)."""
-    key = hashlib.md5("|".join(df.dataset + ":" + df.seq_id.astype(str) + ":" +
-                               df.anno_idx.astype(str) + ":" + df.char_id).encode()).hexdigest()[:12]
-    cache = OUT / f"baselines_oof_{key}.npz"
+def baseline_preds(df: pd.DataFrame, protocol: str = "cv") -> dict[str, np.ndarray]:
+    """Binary out-of-fold predictions of the reference models on all rows (cached)."""
+    key = hashlib.md5((protocol + "|" + "|".join(df.dataset + ":" + df.seq_id.astype(str) + ":" +
+                       df.anno_idx.astype(str) + ":" + df.char_id)).encode()).hexdigest()[:12]
+    cache = OUT / f"baselines_oof_{protocol}_{key}.npz"
     if cache.exists():
         z = np.load(cache)
         return {k: z[k] for k in z.files}
@@ -52,10 +57,20 @@ def baseline_preds(df: pd.DataFrame) -> dict[str, np.ndarray]:
     cols = BASE_COLS + ROLE_COLS
     out = {"rule": (df.rule_pred == "PRN").astype(int).to_numpy(),
            "lgbm+role": np.empty(len(df), int), "stack+role": np.empty(len(df), int)}
-    for tr, te in folds(df):
+    for tr, te in folds(df, protocol):
         out["lgbm+role"][te] = (lgbm_pred(df.iloc[tr], df.iloc[te], cols) == 2).astype(int)
         out["stack+role"][te] = (stack_pred(df.iloc[tr], df.iloc[te], cols) == 2).astype(int)
     np.savez(cache, **out)
+    return out
+
+
+def baselines_both(df: pd.DataFrame) -> dict[str, np.ndarray]:
+    """Rule plus the learned models under both protocols, e.g. 'stack+role (lodo)'."""
+    out = {"rule": (df.rule_pred == "PRN").astype(int).to_numpy()}
+    for proto in ("cv", "lodo"):
+        for k, v in baseline_preds(df, proto).items():
+            if k != "rule":
+                out[f"{k} ({proto})"] = v
     return out
 
 
