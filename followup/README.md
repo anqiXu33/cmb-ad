@@ -45,3 +45,9 @@ Open `kaggle/finetune_encoder.ipynb` on Kaggle (Create → Notebook → File →
 or import from GitHub), set Accelerator = GPU and Internet = On, optionally add a
 `GITHUB_TOKEN` secret, then Run all. The notebook clones the `followup` branch,
 rebuilds the data, trains with `--fp16`, and pushes the summary back to the branch.
+
+## Name heard in dialogue (REFRAMED, Kaggle, CPU)
+
+Open `kaggle/name_heard_reframed.ipynb` on Kaggle (Accelerator None, Internet On), Run all.
+It downloads REFRAMED train+validation (CC BY-NC 4.0), runs `python -m followup.name_heard`,
+and pushes only `results/followup/name_heard_summary.md` / `.json` back to this branch.

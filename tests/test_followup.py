@@ -30,3 +30,13 @@ def test_name_beats_pronoun_and_gender_blocks_binding():
 def test_italian_zero_subject_selftest():
     ok, n = self_test(verbose=False)
     assert ok == n
+
+
+def test_parse_srt_and_cast():
+    from followup.reframed import build_cast, parse_srt, screenplay_names
+    srt = "1\n00:00:01,500 --> 00:00:03,000\n<i>Anna</i> sits.\n\n2\n00:01:00,000 --> 00:01:02,250\nShe\nsmiles.\n"
+    assert parse_srt(srt) == [(1.5, 3.0, "Anna sits."), (60.0, 62.25, "She smiles.")]
+    assert parse_srt("null") == []
+    names = screenplay_names('{"1": "<character>ANNA (V.O.)</character><character>ANNA SMITH</character>"}')
+    cast = build_cast(names)
+    assert [c["role"] for c in cast] == ["Anna Smith"]
