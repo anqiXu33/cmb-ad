@@ -307,6 +307,47 @@ TEXT_FEATURE_COLS = [
     "thread_switch", "shot_scale",
 ] + [f"prev_form_{f}" for f in FORMS]
 
+# Syntactic position of the labelled mention in its AD sentence. Known when the
+# sentence exists (training on human AD, the classic referential-form-selection
+# setting); a planner that runs BEFORE generation does not know it, and should
+# instead output one recommendation per position (see followup/role_eval.py).
+ROLES = ["subj", "obj", "poss", "pobj", "other"]
+ROLE_COLS = [f"role_{r}" for r in ROLES]
+TEXT_FEATURE_COLS = TEXT_FEATURE_COLS + ROLE_COLS
+
+
+def mention_role(doc, start: int, length: int) -> str:
+    span = doc.char_span(start, start + length, alignment_mode="expand")
+    if span is None:
+        return "other"
+    t = span.root
+    if t.dep_ == "conj":                     # "Raj and Penny walk": Penny shares Raj's role
+        while t.dep_ == "conj" and t.head is not t:
+            t = t.head
+    dep = t.dep_
+    if dep in ("nsubj", "nsubjpass"):
+        return "subj"
+    if dep in ("dobj", "dative", "iobj"):
+        return "obj"
+    if dep == "poss" or span.root.tag_ == "PRP$":
+        return "poss"
+    if dep == "pobj":
+        return "pobj"
+    return "other"
+
+
+def add_syntactic_role(df: pd.DataFrame) -> pd.DataFrame:
+    from followup.mentions_en import _nlp
+    nlp = _nlp()
+    roles = []
+    for doc, a, m in zip(nlp.pipe(df["text"].astype(str), batch_size=512), df["m_start"], df["m_text"]):
+        roles.append(mention_role(doc, int(a), len(str(m))))
+    df = df.copy()
+    df["role"] = roles
+    for r in ROLES:
+        df[f"role_{r}"] = (df["role"] == r).astype(int)
+    return df
+
 
 def main(datasets=("madeval", "tvad", "cmdad")):
     all_rows, all_ads, stats = [], [], Counter()
@@ -326,6 +367,7 @@ def main(datasets=("madeval", "tvad", "cmdad")):
     rows = pd.DataFrame(all_rows)
     ads = pd.concat(all_ads, ignore_index=True)
     df, R = build_features(rows, ads)
+    df = add_syntactic_role(df)
     OUT.mkdir(parents=True, exist_ok=True)
     df.to_csv(OUT / "text_features.csv", index=False)
     ads.to_csv(OUT / "text_ads.csv", index=False)
